@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
-from torchvision.models.segmentation import DeepLabV3_ResNet50_Weights, DeepLabV3_ResNet101_Weights
+from torchvision.models import ResNet50_Weights, ResNet101_Weights
 
 from ..base import BaseModel
 
@@ -100,21 +100,24 @@ class DeepLabV3Plus(BaseModel):
         # Load pretrained backbone
         replace_stride_with_dilation = [False, False, output_stride == 8]
         if backbone == "resnet50":
-            weights = DeepLabV3_ResNet50_Weights.DEFAULT if pretrained else None
+            weights = ResNet50_Weights.DEFAULT if pretrained else None
             backbone = torchvision.models.resnet50(weights=weights, replace_stride_with_dilation=replace_stride_with_dilation)
         elif backbone == "resnet101":
-            weights = DeepLabV3_ResNet101_Weights.DEFAULT if pretrained else None
+            weights = ResNet101_Weights.DEFAULT if pretrained else None
             backbone = torchvision.models.resnet101(weights=weights, replace_stride_with_dilation=replace_stride_with_dilation)
         else:
             raise ValueError(f"Unsupported backbone: {backbone}")
         
-        # Remove fully connected layer and last pooling
-        self.backbone_features = []
-        for name, module in backbone.named_children():
-            if name == 'layer4':
-                break
-            self.backbone_features.append(module)
-        self.backbone_features = nn.Sequential(*self.backbone_features)
+        # Extract backbone layers
+        self.initial = nn.Sequential(
+            backbone.conv1,
+            backbone.bn1,
+            backbone.relu,
+            backbone.maxpool
+        )
+        self.layer1 = backbone.layer1  # For low-level features
+        self.layer2 = backbone.layer2
+        self.layer3 = backbone.layer3
         self.layer4 = backbone.layer4
         
         # ASPP module
@@ -122,7 +125,7 @@ class DeepLabV3Plus(BaseModel):
         aspp_dilations = [6, 12, 18] if output_stride == 16 else [12, 24, 36]
         self.aspp = ASPP(inplanes, 256, aspp_dilations)
         
-        # Low-level features processing
+        # Low-level features processing (from layer1 which has 256 channels)
         self.low_level_conv = nn.Sequential(
             nn.Conv2d(256, 48, 1, bias=False),
             nn.BatchNorm2d(48),
@@ -145,15 +148,11 @@ class DeepLabV3Plus(BaseModel):
         input_shape = x.shape[-2:]
         
         # Backbone
-        x = self.backbone_features[0](x)  # conv1
-        x = self.backbone_features[1](x)  # bn1
-        x = self.backbone_features[2](x)  # relu
-        x = self.backbone_features[3](x)  # maxpool
-        x = self.backbone_features[4](x)  # layer1
-        x = self.backbone_features[5](x)  # layer2
-        low_level_feat = x
-        x = self.backbone_features[6](x)  # layer3
-        x = self.layer4(x)  # layer4
+        x = self.initial(x)
+        low_level_feat = self.layer1(x)  # Get low-level features from layer1
+        x = self.layer2(low_level_feat)
+        x = self.layer3(x)
+        x = self.layer4(x)
         
         # ASPP
         x = self.aspp(x)
