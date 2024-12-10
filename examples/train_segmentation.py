@@ -59,6 +59,8 @@ def main():
     # Allow manual device selection but default to best available
     parser.add_argument("--device", type=str, default=None,
                       help="Device to use (cuda, mps, or cpu). If not specified, will use the best available.")
+    parser.add_argument("--monitor_metric", type=str, default="iou",
+                      help="Metric to monitor for early stopping.")
     args = parser.parse_args()
     
     # Set device
@@ -109,7 +111,7 @@ def main():
     )
     
     # Create optimizer and scheduler
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=1e-5)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.num_epochs)
     
     # Define custom metrics if needed
@@ -128,7 +130,8 @@ def main():
         scheduler=scheduler,
         device=device,
         metrics=custom_metrics,
-        ignore_index=args.ignore_index
+        ignore_index=args.ignore_index,
+        monitor_metric=args.monitor_metric
     )
     
     # Train model

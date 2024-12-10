@@ -5,27 +5,37 @@ import torch
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 
-from ..models.base import BaseModel
-
 
 class BaseTrainer(ABC):
     """Base trainer class for all models."""
     
     def __init__(
         self,
-        model: BaseModel,
+        model: Any,
         train_loader: DataLoader,
         val_loader: Optional[DataLoader] = None,
         optimizer: Optional[torch.optim.Optimizer] = None,
         scheduler: Optional[Any] = None,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
+        monitor_metric: str = "loss",
     ):
+        """
+        Args:
+            model: Model to train
+            train_loader: Training data loader
+            val_loader: Validation data loader
+            optimizer: Optimizer to use
+            scheduler: Learning rate scheduler
+            device: Device to use for training
+            monitor_metric: Metric name to monitor for early stopping and model saving
+        """
         self.model = model.to(device)
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.optimizer = optimizer or torch.optim.Adam(model.parameters())
         self.scheduler = scheduler
         self.device = device
+        self.monitor_metric = monitor_metric
         self.epoch = 0
         self.best_metric = float('inf')
         
@@ -98,9 +108,15 @@ class BaseTrainer(ABC):
             history['train'].append(train_metrics)
             history['val'].append(val_metrics)
             
-            # Save best model
-            if save_path and val_metrics:
-                current_metric = val_metrics.get('loss', float('inf'))
+            # Save best model based on validation metric if available, otherwise training metric
+            if save_path:
+                # First try validation metrics, then training metrics
+                current_metric = (
+                    val_metrics.get(self.monitor_metric, float('inf'))
+                    if val_metrics
+                    else train_metrics.get(self.monitor_metric, float('inf'))
+                )
+                
                 if current_metric < self.best_metric:
                     self.best_metric = current_metric
                     self.model.save_weights(save_path)
