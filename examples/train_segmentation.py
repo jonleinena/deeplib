@@ -10,9 +10,10 @@ import torch
 import torch.utils.data as data
 from albumentations.pytorch import ToTensorV2
 from torch.optim.lr_scheduler import CosineAnnealingLR
+import matplotlib.pyplot as plt
 
 from deeplib.datasets import SegmentationDataset
-from deeplib.models.segmentation import DeepLabV3
+from deeplib.models.segmentation import UNet
 from deeplib.trainers import SegmentationTrainer
 from deeplib.metrics import iou_score, dice_score
 
@@ -45,18 +46,53 @@ def get_transform(train: bool = True, input_size: int = 224):
         ])
 
 
+def plot_training_curves(history, save_dir: Path):
+    """Plot training and validation curves."""
+    # Create the plots directory
+    plots_dir = save_dir / "plots"
+    plots_dir.mkdir(exist_ok=True)
+    
+    # Get all metrics from the first epoch
+    if len(history['train']) == 0:
+        print("No training history to plot")
+        return
+        
+    metrics = history['train'][0].keys()
+    epochs = range(len(history['train']))
+    
+    # Plot each metric
+    for metric in metrics:
+        plt.figure(figsize=(10, 6))
+        
+        # Get values for this metric
+        train_values = [epoch_metrics[metric] for epoch_metrics in history['train']]
+        plt.plot(epochs, train_values, 'b-', label=f'Training')
+        
+        # Plot validation if available
+        if history['val'] and metric in history['val'][0]:
+            val_values = [epoch_metrics[metric] for epoch_metrics in history['val']]
+            plt.plot(epochs, val_values, 'r-', label=f'Validation')
+        
+        plt.title(f'{metric} vs Epochs')
+        plt.xlabel('Epoch')
+        plt.ylabel(metric)
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(plots_dir / f'{metric}_curve.png')
+        plt.close()
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_root", type=str, required=True)
     parser.add_argument("--images_dir", type=str, default="images")
     parser.add_argument("--masks_dir", type=str, default="masks")
     parser.add_argument("--num_classes", type=int, required=True)
-    parser.add_argument("--num_epochs", type=int, default=100)
-    parser.add_argument("--batch_size", type=int, default=32)
+    parser.add_argument("--num_epochs", type=int, default=50)
+    parser.add_argument("--batch_size", type=int, default=64)
     parser.add_argument("--learning_rate", type=float, default=1e-4)
     parser.add_argument("--input_size", type=int, default=224)
     parser.add_argument("--ignore_index", type=int, default=255)
-    # Allow manual device selection but default to best available
     parser.add_argument("--device", type=str, default=None,
                       help="Device to use (cuda, mps, or cpu). If not specified, will use the best available.")
     parser.add_argument("--monitor_metric", type=str, default="iou",
@@ -66,6 +102,10 @@ def main():
     # Set device
     device = torch.device(args.device) if args.device else get_device()
     print(f"Using device: {device}")
+    
+    # Create output directory
+    output_dir = Path("outputs")
+    output_dir.mkdir(exist_ok=True)
     
     # Create datasets
     train_dataset = SegmentationDataset(
@@ -104,17 +144,15 @@ def main():
     )
     
     # Create model
-    model = DeepLabV3(
-        num_classes=args.num_classes,
-        pretrained=True,
-        backbone="resnet50"
+    model = UNet(
+        num_classes=args.num_classes
     )
     
     # Create optimizer and scheduler
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=1e-5)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=0.05)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.num_epochs)
     
-    # Define custom metrics if needed
+    # Define custom metrics
     custom_metrics = [
         lambda x, y: iou_score(x, y, args.num_classes, args.ignore_index),
         lambda x, y: dice_score(x, y, args.num_classes, args.ignore_index)
@@ -135,14 +173,16 @@ def main():
     )
     
     # Train model
-    save_path = Path("checkpoints") / "deeplabv3_segmentation.pth"
+    save_path = output_dir / "checkpoints" / "UNet_segmentation.pth"
     save_path.parent.mkdir(exist_ok=True)
     
     history = trainer.train(
         num_epochs=args.num_epochs,
-        save_path=str(save_path),
-        early_stopping=10
+        save_path=str(save_path)
     )
+    
+    # Plot training curves
+    plot_training_curves(history, output_dir)
 
 
 if __name__ == "__main__":

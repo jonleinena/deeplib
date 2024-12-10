@@ -33,7 +33,6 @@ class SegmentationTrainer(BaseTrainer):
             device: Device to use
             metrics: List of metric functions to compute during validation
             ignore_index: Index to ignore in metrics computation
-            monitor_metric: Metric to monitor for early stopping and model saving
         """
         super().__init__(
             model=model,
@@ -41,8 +40,7 @@ class SegmentationTrainer(BaseTrainer):
             val_loader=val_loader,
             optimizer=optimizer,
             scheduler=scheduler,
-            device=device,
-            monitor_metric=monitor_metric
+            device=device
         )
         self.metrics = metrics or [
             lambda x, y: iou_score(x, y, model.num_classes, ignore_index),
@@ -112,7 +110,7 @@ class SegmentationTrainer(BaseTrainer):
         """Perform a single training step."""
         images, masks = batch
         images = images.to(self.device)
-        masks = masks.to(self.device)
+        masks = masks.to(self.device)  # No need for .long() conversion anymore
         
         # Forward pass
         outputs = self.model(images)
@@ -135,7 +133,7 @@ class SegmentationTrainer(BaseTrainer):
         """Perform a single validation step."""
         images, masks = batch
         images = images.to(self.device)
-        masks = masks.to(self.device)
+        masks = masks.to(self.device)  # No need for .long() conversion anymore
         
         # Forward pass
         outputs = self.model(images)
