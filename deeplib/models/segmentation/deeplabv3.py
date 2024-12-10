@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchvision
 from torchvision.models.segmentation.deeplabv3 import DeepLabHead
+from torchvision.models.segmentation import DeepLabV3_ResNet50_Weights, DeepLabV3_ResNet101_Weights
 
 from ..base import BaseModel
 
@@ -33,14 +34,16 @@ class DeepLabV3(BaseModel):
         
         # Load pretrained model
         if backbone == "resnet50":
+            weights = DeepLabV3_ResNet50_Weights.DEFAULT if pretrained else None
             self.model = torchvision.models.segmentation.deeplabv3_resnet50(
-                pretrained=pretrained,
+                weights=weights,
                 aux_loss=aux_loss,
                 **kwargs
             )
         elif backbone == "resnet101":
+            weights = DeepLabV3_ResNet101_Weights.DEFAULT if pretrained else None
             self.model = torchvision.models.segmentation.deeplabv3_resnet101(
-                pretrained=pretrained,
+                weights=weights,
                 aux_loss=aux_loss,
                 **kwargs
             )
