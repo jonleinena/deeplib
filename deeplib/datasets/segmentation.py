@@ -92,14 +92,17 @@ class SegmentationDataset(BaseDataset):
             
         Returns:
             Preprocessed mask as a long tensor with shape (H, W)
+            Values are in range [0, num_classes-1] where:
+            - 0 represents background (will be ignored in loss and metrics)
+            - [1, num_classes-1] represent actual classes
         """
         # Read mask (grayscale)
         mask = cv2.imread(mask_path, cv2.IMREAD_GRAYSCALE)
         if mask is None:
             raise RuntimeError(f"Failed to load mask: {mask_path}")
             
-        # Convert to numpy array and ensure int64 type
-        mask = np.array(mask) #, dtype=np.int64)
+        # Convert to numpy array
+        mask = np.array(mask)
             
         # Verify mask values
         unique_values = np.unique(mask)
@@ -109,7 +112,7 @@ class SegmentationDataset(BaseDataset):
                 f"got values: {unique_values}"
             )
             
-        return torch.from_numpy(mask)  # numpy int64 will automatically convert to torch.long
+        return torch.from_numpy(mask).long()  # Convert to long tensor
     
     def __getitem__(self, idx: int) -> Tuple[torch.Tensor, torch.Tensor]:
         """Get a dataset sample.

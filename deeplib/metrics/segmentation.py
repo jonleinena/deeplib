@@ -9,7 +9,8 @@ def iou_score(
     targets: torch.Tensor,
     num_classes: int,
     ignore_index: Optional[int] = None,
-    eps: float = 1e-6
+    eps: float = 1e-6,
+    exclude_background: bool = True
 ) -> torch.Tensor:
     """Calculate IoU score.
     
@@ -19,14 +20,18 @@ def iou_score(
         num_classes: Number of classes
         ignore_index: Index to ignore from evaluation
         eps: Small constant to avoid division by zero
+        exclude_background: Whether to exclude background class (0) from calculation
         
     Returns:
-        IoU score for each class
+        Mean IoU score over non-background classes
     """
     outputs = torch.argmax(outputs, dim=1)
     ious = []
     
-    for cls in range(num_classes):
+    # Start from 1 if excluding background
+    start_cls = 1 if exclude_background else 0
+    
+    for cls in range(start_cls, num_classes):
         if cls == ignore_index:
             continue
             
@@ -47,7 +52,8 @@ def dice_score(
     targets: torch.Tensor,
     num_classes: int,
     ignore_index: Optional[int] = None,
-    eps: float = 1e-6
+    eps: float = 1e-6,
+    exclude_background: bool = True
 ) -> torch.Tensor:
     """Calculate Dice score.
     
@@ -57,14 +63,18 @@ def dice_score(
         num_classes: Number of classes
         ignore_index: Index to ignore from evaluation
         eps: Small constant to avoid division by zero
+        exclude_background: Whether to exclude background class (0) from calculation
         
     Returns:
-        Dice score for each class
+        Mean Dice score over non-background classes
     """
     outputs = torch.argmax(outputs, dim=1)
     dice_scores = []
     
-    for cls in range(num_classes):
+    # Start from 1 if excluding background
+    start_cls = 1 if exclude_background else 0
+    
+    for cls in range(start_cls, num_classes):
         if cls == ignore_index:
             continue
             
@@ -83,7 +93,8 @@ def dice_score(
 def pixel_accuracy(
     outputs: torch.Tensor,
     targets: torch.Tensor,
-    ignore_index: Optional[int] = None
+    ignore_index: Optional[int] = None,
+    exclude_background: bool = True
 ) -> torch.Tensor:
     """Calculate pixel accuracy.
     
@@ -91,11 +102,21 @@ def pixel_accuracy(
         outputs: Model outputs of shape (N, C, H, W)
         targets: Ground truth of shape (N, H, W)
         ignore_index: Index to ignore from evaluation
+        exclude_background: Whether to exclude background pixels from calculation
         
     Returns:
-        Pixel accuracy
+        Pixel accuracy (excluding background if specified)
     """
     outputs = torch.argmax(outputs, dim=1)
-    mask = targets != ignore_index if ignore_index is not None else torch.ones_like(targets, dtype=torch.bool)
-    correct = (outputs == targets) & mask
-    return correct.float().sum() / mask.float().sum() 
+    
+    # Create mask for valid pixels
+    if exclude_background:
+        valid_mask = targets > 0  # Exclude background
+    else:
+        valid_mask = torch.ones_like(targets, dtype=torch.bool)
+    
+    if ignore_index is not None:
+        valid_mask &= targets != ignore_index
+    
+    correct = (outputs == targets) & valid_mask
+    return correct.float().sum() / valid_mask.float().sum() 
