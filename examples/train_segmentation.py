@@ -90,8 +90,8 @@ def main():
     parser.add_argument("--num_classes", type=int, required=True)
     parser.add_argument("--num_epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--learning_rate", type=float, default=1e-4)
-    parser.add_argument("--input_size", type=int, default=224)
+    parser.add_argument("--learning_rate", type=float, default=1e-5)
+    parser.add_argument("--input_size", type=int, default=192)
     parser.add_argument("--ignore_index", type=int, default=255)
     parser.add_argument("--device", type=str, default=None,
                       help="Device to use (cuda, mps, or cpu). If not specified, will use the best available.")
@@ -149,7 +149,7 @@ def main():
     )
     
     # Create optimizer and scheduler
-    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=0.05)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=0.1)
     scheduler = CosineAnnealingLR(optimizer, T_max=args.num_epochs)
     
     # Define custom metrics

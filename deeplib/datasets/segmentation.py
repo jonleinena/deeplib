@@ -106,6 +106,8 @@ class SegmentationDataset(BaseDataset):
             
         # Verify mask values
         unique_values = np.unique(mask)
+        if len(unique_values) == 1 and unique_values[0] == 0:
+            raise RuntimeError(f"Mask contains only background values: {unique_values}")
         if len(unique_values) > self.num_classes:
             raise RuntimeError(
                 f"Mask contains invalid values. Expected values in range [0, {self.num_classes-1}], "

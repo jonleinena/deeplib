@@ -3,7 +3,7 @@ NEU_*/
 
 #model checkpoints
 checkpoints/
-outputs/
+outputs*/
 visualizations/
 
 # Byte-compiled / optimized / DLL files

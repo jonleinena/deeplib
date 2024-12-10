@@ -37,30 +37,39 @@ class BaseTrainer(ABC):
         self.device = device
         self.monitor_metric = monitor_metric
         self.epoch = 0
-        self.best_metric = float('inf')
+        self.best_metric = float('inf') if self.monitor_metric == 'loss' else -float('inf')
         
     def train_epoch(self) -> Dict[str, float]:
         """Train for one epoch."""
         self.model.train()
-        total_loss = 0
-        metrics = {}
+        total_metrics = {}
+        num_batches = len(self.train_loader)
         
         with tqdm(self.train_loader, desc=f'Epoch {self.epoch}') as pbar:
-            for batch in pbar:
+            for batch_idx, batch in enumerate(pbar, 1):
                 self.optimizer.zero_grad()
-                loss_dict = self.train_step(batch)
-                loss = sum(loss_dict.values())
+                metrics = self.train_step(batch)
+                
+                # Only sum loss terms (those ending with '_loss')
+                loss = sum(v for k, v in metrics.items() if k.endswith('_loss'))
                 loss.backward()
                 self.optimizer.step()
                 
-                total_loss += loss.item()
-                metrics.update({k: v.item() for k, v in loss_dict.items()})
-                pbar.set_postfix({k: f'{v:.4f}' for k, v in metrics.items()})
+                # Update metrics
+                for k, v in metrics.items():
+                    total_metrics[k] = total_metrics.get(k, 0) + v.item()
+                
+                # Update progress bar with running averages
+                running_metrics = {k: f"{v / batch_idx:.4f}" for k, v in total_metrics.items()}
+                pbar.set_postfix(running_metrics)
+        
+        # Average metrics
+        avg_metrics = {k: v / num_batches for k, v in total_metrics.items()}
         
         if self.scheduler is not None:
             self.scheduler.step()
             
-        return metrics
+        return avg_metrics
     
     @abstractmethod
     def train_step(self, batch: Any) -> Dict[str, torch.Tensor]:
@@ -112,14 +121,16 @@ class BaseTrainer(ABC):
             if save_path:
                 # First try validation metrics, then training metrics
                 current_metric = (
-                    val_metrics.get(self.monitor_metric, float('inf'))
+                    val_metrics.get(self.monitor_metric, -float('inf'))
                     if val_metrics
-                    else train_metrics.get(self.monitor_metric, float('inf'))
+                    else train_metrics.get(self.monitor_metric, -float('inf'))
                 )
-                
-                if current_metric < self.best_metric:
+
+                metric_improved = current_metric < self.best_metric if self.monitor_metric == 'loss' else current_metric > self.best_metric
+                if metric_improved:
                     self.best_metric = current_metric
                     self.model.save_weights(save_path)
+                    print(f"Saved model to {save_path}")
                     no_improve = 0
                 else:
                     no_improve += 1
