@@ -19,6 +19,7 @@ class DeepLabV3(BaseModel):
         pretrained: bool = True,
         backbone: str = "resnet50",
         aux_loss: bool = True,
+        dropout_p: float = 0.1,
         **kwargs
     ):
         """
@@ -27,6 +28,7 @@ class DeepLabV3(BaseModel):
             pretrained: Whether to use pretrained backbone
             backbone: Backbone network (resnet50 or resnet101)
             aux_loss: Whether to use auxiliary loss
+            dropout_p: Dropout probability (0.0 means no dropout)
         """
         super().__init__()
         self.model_type = "segmentation"
@@ -50,10 +52,17 @@ class DeepLabV3(BaseModel):
         else:
             raise ValueError(f"Unsupported backbone: {backbone}")
         
-        # Replace classifier head
-        self.model.classifier = DeepLabHead(2048, num_classes)
+        # Replace classifier head with dropout
+        self.model.classifier = nn.Sequential(
+            DeepLabHead(2048, num_classes),
+            nn.Dropout2d(p=dropout_p) if dropout_p > 0 else nn.Identity()
+        )
+        
         if aux_loss:
-            self.model.aux_classifier[4] = nn.Conv2d(256, num_classes, kernel_size=1)
+            self.model.aux_classifier[4] = nn.Sequential(
+                nn.Conv2d(256, num_classes, kernel_size=1),
+                nn.Dropout2d(p=dropout_p) if dropout_p > 0 else nn.Identity()
+            )
     
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Forward pass."""

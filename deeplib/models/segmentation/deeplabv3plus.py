@@ -81,6 +81,7 @@ class DeepLabV3Plus(BaseModel):
         backbone: str = "resnet50",
         pretrained: bool = True,
         output_stride: int = 16,
+        dropout_p: float = 0.1,  # Default dropout probability
         **kwargs
     ):
         """
@@ -132,16 +133,19 @@ class DeepLabV3Plus(BaseModel):
             nn.ReLU()
         )
         
-        # Final decoder
-        self.decoder = nn.Sequential(
+        # Final decoder with dropout
+        decoder_layers = [
             nn.Conv2d(304, 256, 3, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.ReLU(),
+            nn.Dropout2d(p=dropout_p) if dropout_p > 0 else nn.Identity(),
             nn.Conv2d(256, 256, 3, padding=1, bias=False),
             nn.BatchNorm2d(256),
             nn.ReLU(),
+            nn.Dropout2d(p=dropout_p) if dropout_p > 0 else nn.Identity(),
             nn.Conv2d(256, num_classes, 1)
-        )
+        ]
+        self.decoder = nn.Sequential(*decoder_layers)
     
     def forward(self, x: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Forward pass."""

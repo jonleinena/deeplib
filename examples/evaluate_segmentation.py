@@ -39,6 +39,8 @@ def save_visualization(image: torch.Tensor, pred: torch.Tensor, target: torch.Te
     pred_mask = colors[pred]
     target_mask = colors[target]
 
+    print(f"Image channels: {image.shape}")
+
     # Normalize image to 0-255 range if needed
     if image.max() <= 1.0:
         image = (image * 255).astype(np.uint8)

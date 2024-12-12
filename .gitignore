@@ -1,5 +1,6 @@
 #dataset
 NEU_*/
+data/
 
 #model checkpoints
 checkpoints/
