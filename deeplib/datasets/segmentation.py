@@ -79,8 +79,8 @@ class SegmentationDataset(BaseDataset):
         # Convert BGR to RGB
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
-        # Convert to float32 and normalize to [0, 1]
-        image = image.astype(np.float32) / 255.0
+        # Convert to float32 but don't divide by 255 since normalization is handled in transformations
+        image = image.astype(np.float32)
         
         return torch.from_numpy(image)
     

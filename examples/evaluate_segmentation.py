@@ -22,8 +22,15 @@ import random
 
 def save_visualization(image: torch.Tensor, pred: torch.Tensor, target: torch.Tensor, save_path: str):
     """Save visualization of original image, prediction and ground truth side by side."""
-    # Convert tensors to numpy arrays
+    # Convert tensors to numpy arrays and denormalize the image
     image = image.cpu().numpy().transpose(1, 2, 0)  # CHW -> HWC
+    
+    # Denormalize using ImageNet mean and std
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    image = std * image + mean
+    image = np.clip(image * 255, 0, 255).astype(np.uint8)
+    
     pred = pred.squeeze(0).cpu().numpy()
     target = target.cpu().numpy()
  
@@ -39,12 +46,6 @@ def save_visualization(image: torch.Tensor, pred: torch.Tensor, target: torch.Te
     pred_mask = colors[pred]
     target_mask = colors[target]
 
-    print(f"Image channels: {image.shape}")
-
-    # Normalize image to 0-255 range if needed
-    if image.max() <= 1.0:
-        image = (image * 255).astype(np.uint8)
-    
     # Create a side-by-side visualization
     h, w = image.shape[:2]
     vis = np.zeros((h, w * 3, 3), dtype=np.uint8)
@@ -92,14 +93,15 @@ def main():
         masks_dir=args.masks_dir,
         num_classes=args.num_classes,
         split="val",
-        transform=get_transform(train=False, input_size=args.input_size)
+        transform=get_transform(train=False, input_size=args.input_size),
+        file_extension="png"
     )
     
     dataloader = DataLoader(
         dataset,
         batch_size=args.batch_size,
         shuffle=False,
-        num_workers=4,
+        num_workers=1,
         pin_memory=True if device.type in ["cuda", "mps"] else False
     )
     
