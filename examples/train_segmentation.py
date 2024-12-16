@@ -9,7 +9,7 @@ import albumentations as A
 import torch
 import torch.utils.data as data
 from albumentations.pytorch import ToTensorV2
-from torch.optim.lr_scheduler import CosineAnnealingLR
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 import matplotlib.pyplot as plt
 
 from deeplib.datasets import SegmentationDataset
@@ -159,7 +159,7 @@ def main():
     
     # Create optimizer and scheduler
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=0.1)
-    scheduler = CosineAnnealingLR(optimizer, T_max=args.num_epochs)
+    scheduler = ReduceLROnPlateau(optimizer, mode='max', factor=0.1, patience=5, verbose=True)
     
     # Define custom metrics
     custom_metrics = [

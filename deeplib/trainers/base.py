@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 
 import torch
 from torch.utils.data import DataLoader
+from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau
 from tqdm import tqdm
 
 
@@ -39,6 +40,18 @@ class BaseTrainer(ABC):
         self.epoch = 0
         self.best_metric = float('inf') if self.monitor_metric == 'loss' else -float('inf')
         
+    def _step_scheduler(self, val_metrics: Optional[Dict[str, float]] = None):
+        """Handle scheduler step with proper metric handling."""
+        if self.scheduler is None:
+            return
+            
+        if isinstance(self.scheduler, ReduceLROnPlateau):
+            if val_metrics is None:
+                return
+            self.scheduler.step(val_metrics.get(self.monitor_metric, 0))
+        else:
+            self.scheduler.step()
+
     def train_epoch(self) -> Dict[str, float]:
         """Train for one epoch."""
         self.model.train()
@@ -59,16 +72,14 @@ class BaseTrainer(ABC):
                 for k, v in metrics.items():
                     total_metrics[k] = total_metrics.get(k, 0) + v.item()
                 
-                # Update progress bar with running averages
+                # Update progress bar with running averages and current learning rate
                 running_metrics = {k: f"{v / batch_idx:.4f}" for k, v in total_metrics.items()}
+                current_lr = self.optimizer.param_groups[0]['lr']
+                running_metrics['lr'] = f"{current_lr:.2e}"
                 pbar.set_postfix(running_metrics)
         
         # Average metrics
         avg_metrics = {k: v / num_batches for k, v in total_metrics.items()}
-        
-        if self.scheduler is not None:
-            self.scheduler.step()
-            
         return avg_metrics
     
     @abstractmethod
@@ -82,17 +93,18 @@ class BaseTrainer(ABC):
             return {}
             
         self.model.eval()
-        metrics = {}
+        total_metrics = {}
+        num_batches = len(self.val_loader)
         
         with torch.no_grad():
             for batch in tqdm(self.val_loader, desc='Validation'):
-                batch_metrics = self.validate_step(batch)
-                for k, v in batch_metrics.items():
-                    metrics[k] = metrics.get(k, 0) + v.item()
+                metrics = self.validate_step(batch)
+                for k, v in metrics.items():
+                    total_metrics[k] = total_metrics.get(k, 0) + v.item()
         
-        # Average the metrics
-        metrics = {k: v / len(self.val_loader) for k, v in metrics.items()}
-        return metrics
+        # Average metrics
+        avg_metrics = {k: v / num_batches for k, v in total_metrics.items()}
+        return avg_metrics
     
     @abstractmethod
     def validate_step(self, batch: Any) -> Dict[str, torch.Tensor]:
@@ -113,6 +125,9 @@ class BaseTrainer(ABC):
             self.epoch = epoch
             train_metrics = self.train_epoch()
             val_metrics = self.validate()
+            
+            # Step scheduler with appropriate metrics
+            self._step_scheduler(val_metrics)
             
             history['train'].append(train_metrics)
             history['val'].append(val_metrics)
