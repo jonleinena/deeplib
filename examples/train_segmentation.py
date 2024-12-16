@@ -90,13 +90,16 @@ def main():
     parser.add_argument("--num_classes", type=int, required=True)
     parser.add_argument("--num_epochs", type=int, default=50)
     parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--learning_rate", type=float, default=1e-5)
+    parser.add_argument("--learning_rate", type=float, default=1e-4)
     parser.add_argument("--input_size", type=int, default=192)
     parser.add_argument("--ignore_index", type=int, default=255)
+    parser.add_argument("--dropout_p", type=float, default=0.1)
     parser.add_argument("--device", type=str, default=None,
                       help="Device to use (cuda, mps, or cpu). If not specified, will use the best available.")
     parser.add_argument("--monitor_metric", type=str, default="iou",
                       help="Metric to monitor for early stopping.")
+    parser.add_argument("--loss", type=str, default="dice", choices=["ce", "dice", "wce", "jaccard", "focal"],
+                      help="Loss function to use (ce: cross entropy, dice: dice loss, wce: weighted cross entropy, jaccard: IoU loss, focal: focal loss)")
     args = parser.parse_args()
     
     # Set device
@@ -114,7 +117,8 @@ def main():
         masks_dir=args.masks_dir,
         num_classes=args.num_classes,
         split="train",
-        transform=get_transform(train=True, input_size=args.input_size)
+        transform=get_transform(train=True, input_size=args.input_size),
+        file_extension="png"
     )
     
     val_dataset = SegmentationDataset(
@@ -123,7 +127,8 @@ def main():
         masks_dir=args.masks_dir,
         num_classes=args.num_classes,
         split="val",
-        transform=get_transform(train=False, input_size=args.input_size)
+        transform=get_transform(train=False, input_size=args.input_size),
+        file_extension="png"
     )
     
     # Create data loaders
@@ -131,7 +136,7 @@ def main():
         train_dataset,
         batch_size=args.batch_size,
         shuffle=True,
-        num_workers=4,
+        num_workers=1,
         pin_memory=True if device.type in ["cuda", "mps"] else False
     )
     
@@ -139,14 +144,18 @@ def main():
         val_dataset,
         batch_size=args.batch_size,
         shuffle=False,
-        num_workers=4,
+        num_workers=1,
         pin_memory=True if device.type in ["cuda", "mps"] else False
     )
     
     # Create model
     model = UNet(
-        num_classes=args.num_classes
+        num_classes=args.num_classes,
+        dropout_p=args.dropout_p
     )
+    
+    # Configure loss function
+    model.configure_loss(args.loss, {'ignore_index': args.ignore_index})
     
     # Create optimizer and scheduler
     optimizer = torch.optim.AdamW(model.parameters(), lr=args.learning_rate, weight_decay=0.1)

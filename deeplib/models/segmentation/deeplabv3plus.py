@@ -174,12 +174,12 @@ class DeepLabV3Plus(BaseModel):
     
     def get_loss(self, predictions: Dict[str, torch.Tensor], target: torch.Tensor) -> Dict[str, torch.Tensor]:
         """Calculate segmentation loss."""
+        if self.loss_fn is None:
+            # Default to cross entropy if no loss function is configured
+            self.configure_loss('ce', {'ignore_index': 255})
+            
         return {
-            "seg_loss": F.cross_entropy(
-                predictions["out"],
-                target,
-                ignore_index=255
-            )
+            "seg_loss": self.loss_fn(predictions["out"], target)
         }
     
     def predict(self, x: torch.Tensor) -> torch.Tensor:
