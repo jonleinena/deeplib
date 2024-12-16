@@ -128,7 +128,7 @@ history = trainer.train(
 )
 ```
 
-## Command Line Training
+## Running the Training example
 
 Train a segmentation model with different loss functions:
 ```bash
