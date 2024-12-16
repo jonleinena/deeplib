@@ -1,3 +1,7 @@
+import os
+import sys
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import argparse
 from pathlib import Path
 
@@ -10,38 +14,55 @@ from tqdm import tqdm
 from deeplib.datasets import SegmentationDataset
 from deeplib.models.segmentation import DeepLabV3, DeepLabV3Plus, UNet
 from deeplib.metrics import iou_score, dice_score, pixel_accuracy
+from deeplib.trainers import SegmentationTrainer
 from train_segmentation import get_transform
+
+import random
 
 
 def save_visualization(image: torch.Tensor, pred: torch.Tensor, target: torch.Tensor, save_path: str):
-    """Save visualization of prediction vs ground truth."""
-    # Convert tensors to numpy arrays
+    """Save visualization of original image, prediction and ground truth side by side."""
+    # Convert tensors to numpy arrays and denormalize the image
     image = image.cpu().numpy().transpose(1, 2, 0)  # CHW -> HWC
-    pred = pred.cpu().numpy()
+    
+    # Denormalize using ImageNet mean and std
+    mean = np.array([0.485, 0.456, 0.406])
+    std = np.array([0.229, 0.224, 0.225])
+    image = std * image + mean
+    image = np.clip(image * 255, 0, 255).astype(np.uint8)
+    
+    pred = pred.squeeze(0).cpu().numpy()
     target = target.cpu().numpy()
+ 
+    # Define colors for each class (in RGB format)
+    colors = np.array([
+        [0, 0, 0],      # Class 0 (Background) - Black
+        [255, 0, 0],    # Class 1 - Red
+        [0, 255, 0],    # Class 2 - Green
+        [0, 0, 255]     # Class 3 - Blue
+    ])
+
+    # Create colored masks for prediction and target
+    pred_mask = colors[pred]
+    target_mask = colors[target]
+
+    # Create a side-by-side visualization
+    h, w = image.shape[:2]
+    vis = np.zeros((h, w * 3, 3), dtype=np.uint8)
     
-    # Normalize image
-    image = ((image * [0.229, 0.224, 0.225] + [0.485, 0.456, 0.406]) * 255).astype(np.uint8)
+    # Place images side by side
+    vis[:, :w] = image
+    vis[:, w:2*w] = target_mask
+    vis[:, 2*w:] = pred_mask
     
-    # Create color maps for prediction and target
-    colors = [(0, 0, 0), (255, 0, 0), (0, 255, 0), (0, 0, 255)]  # BGR format, up to 4 classes
-    pred_vis = np.zeros_like(image)
-    target_vis = np.zeros_like(image)
+    # Add labels
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cv2.putText(vis, 'Original', (w//2 - 50, 30), font, 1, (255, 255, 255), 2)
+    cv2.putText(vis, 'Ground Truth', (3*w//2 - 80, 30), font, 1, (255, 255, 255), 2)
+    cv2.putText(vis, 'Prediction', (5*w//2 - 60, 30), font, 1, (255, 255, 255), 2)
     
-    for cls, color in enumerate(colors[:pred.max() + 1]):
-        pred_vis[pred == cls] = color
-        target_vis[target == cls] = color
-    
-    # Blend with original image
-    alpha = 0.5
-    pred_blend = cv2.addWeighted(image, 1 - alpha, pred_vis, alpha, 0)
-    target_blend = cv2.addWeighted(image, 1 - alpha, target_vis, alpha, 0)
-    
-    # Concatenate horizontally: Original | Prediction | Ground Truth
-    vis = np.concatenate([image, pred_blend, target_blend], axis=1)
-    
-    # Save visualization
-    cv2.imwrite(save_path, vis)
+    # Save the visualization
+    cv2.imwrite(str(save_path), cv2.cvtColor(vis, cv2.COLOR_RGB2BGR))
 
 
 def main():
@@ -54,8 +75,8 @@ def main():
     parser.add_argument("--num_classes", type=int, required=True)
     parser.add_argument("--images_dir", type=str, default="images")
     parser.add_argument("--masks_dir", type=str, default="masks")
-    parser.add_argument("--batch_size", type=int, default=8)
-    parser.add_argument("--input_size", type=int, default=224)
+    parser.add_argument("--batch_size", type=int, default=64)
+    parser.add_argument("--input_size", type=int, default=192)
     parser.add_argument("--device", type=str, default=None)
     parser.add_argument("--vis_dir", type=str, default="visualizations")
     parser.add_argument("--ignore_index", type=int, default=255)
@@ -72,14 +93,15 @@ def main():
         masks_dir=args.masks_dir,
         num_classes=args.num_classes,
         split="val",
-        transform=get_transform(train=False, input_size=args.input_size)
+        transform=get_transform(train=False, input_size=args.input_size),
+        file_extension="png"
     )
     
     dataloader = DataLoader(
         dataset,
         batch_size=args.batch_size,
         shuffle=False,
-        num_workers=4,
+        num_workers=1,
         pin_memory=True if device.type in ["cuda", "mps"] else False
     )
     
@@ -92,70 +114,25 @@ def main():
         model = UNet(num_classes=args.num_classes)
     
     model.load_weights(args.checkpoint)
-    model = model.to(device)
-    model.eval()
-    
+
+    trainer = SegmentationTrainer(model=model, train_loader=None, val_loader=dataloader, device=device)
+
     # Create visualization directory
     vis_dir = Path(args.vis_dir)
     vis_dir.mkdir(exist_ok=True)
     
-    # Evaluate
-    total_metrics = {
-        "iou": 0.0,
-        "dice": 0.0,
-        "accuracy": 0.0,
-        "loss": 0.0
-    }
+ 
+    metrics = trainer.validate()
+    print(metrics)
+
+    random_numbers = random.sample(range(0, 841), 8)
+
+    for i in random_numbers:
+        image, mask = dataset[i]
+        pred = model.predict(image.unsqueeze(0).to(device))
+        save_visualization(image, pred, mask, vis_dir / f"visualization_{i}.png")
+
     
-    num_batches = len(dataloader)
-    with torch.no_grad():
-        for batch_idx, (images, masks) in enumerate(tqdm(dataloader)):
-            images = images.to(device)
-            masks = masks.to(device)
-            
-            # Forward pass
-            outputs = model(images)
-            predictions = outputs["out"]
-            print(np.max(predictions))
-            print(predictions.shape)
-            
-            # Calculate metrics
-            total_metrics["iou"] += iou_score(
-                predictions, masks, args.num_classes, 
-                args.ignore_index, exclude_background=True
-            ).item()
-            total_metrics["dice"] += dice_score(
-                predictions, masks, args.num_classes, 
-                args.ignore_index, exclude_background=True
-            ).item()
-            total_metrics["accuracy"] += pixel_accuracy(
-                predictions, masks, args.ignore_index, 
-                exclude_background=True
-            ).item()
-            
-            # Calculate loss
-            loss_dict = model.get_loss(outputs, masks)
-            total_metrics["loss"] += loss_dict["seg_loss"].item()
-            
-            # Save visualizations for first batch
-            if batch_idx == 0:
-                pred_masks = torch.argmax(predictions, dim=1)
-                for i in range(min(4, len(images))):
-                    save_path = vis_dir / f"sample_{i}.png"
-                    save_visualization(
-                        images[i],
-                        pred_masks[i],
-                        masks[i],
-                        str(save_path)
-                    )
-    
-    # Average metrics
-    avg_metrics = {k: v / num_batches for k, v in total_metrics.items()}
-    
-    # Print results
-    print("\nEvaluation Results:")
-    for key, value in avg_metrics.items():
-        print(f"{key}: {value:.4f}")
 
 
 if __name__ == "__main__":

@@ -3,6 +3,15 @@ from typing import Any, Dict, Optional, Union
 
 import torch
 import torch.nn as nn
+from torch.optim.lr_scheduler import (
+    StepLR,
+    MultiStepLR,
+    ExponentialLR,
+    CosineAnnealingLR,
+    ReduceLROnPlateau,
+    OneCycleLR,
+    CosineAnnealingWarmRestarts
+)
 
 
 class BaseModel(nn.Module, ABC):
@@ -11,7 +20,24 @@ class BaseModel(nn.Module, ABC):
     def __init__(self):
         super().__init__()
         self.model_type: str = ""  # detection, segmentation, or anomaly
+        self.loss_fn = None
         
+    def configure_loss(self, loss_type: str, loss_params: Optional[Dict] = None) -> None:
+        """Configure loss function.
+        
+        Args:
+            loss_type: Type of loss function to use
+            loss_params: Parameters for the loss function
+        """
+        from .segmentation.losses import LOSS_FUNCTIONS
+        
+        if loss_type not in LOSS_FUNCTIONS:
+            raise ValueError(f"Unsupported loss type: {loss_type}. "
+                           f"Supported types are: {list(LOSS_FUNCTIONS.keys())}")
+        
+        params = loss_params or {}
+        self.loss_fn = LOSS_FUNCTIONS[loss_type](**params)
+    
     @abstractmethod
     def forward(self, x: torch.Tensor) -> Union[torch.Tensor, Dict[str, torch.Tensor]]:
         """Forward pass of the model."""

@@ -79,8 +79,8 @@ class SegmentationDataset(BaseDataset):
         # Convert BGR to RGB
         image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         
-        # Convert to float32 and normalize to [0, 1]
-        image = image.astype(np.float32) / 255.0
+        # Convert to float32 but don't divide by 255 since normalization is handled in transformations
+        image = image.astype(np.float32)
         
         return torch.from_numpy(image)
     
@@ -106,6 +106,8 @@ class SegmentationDataset(BaseDataset):
             
         # Verify mask values
         unique_values = np.unique(mask)
+        if len(unique_values) == 1 and unique_values[0] == 0:
+            raise RuntimeError(f"Mask contains only background values: {unique_values}")
         if len(unique_values) > self.num_classes:
             raise RuntimeError(
                 f"Mask contains invalid values. Expected values in range [0, {self.num_classes-1}], "

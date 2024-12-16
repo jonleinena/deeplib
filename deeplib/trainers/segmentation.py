@@ -33,7 +33,6 @@ class SegmentationTrainer(BaseTrainer):
             device: Device to use
             metrics: List of metric functions to compute during validation
             ignore_index: Index to ignore in metrics computation
-            monitor_metric: Metric to monitor for early stopping and model saving
         """
         super().__init__(
             model=model,
@@ -52,35 +51,25 @@ class SegmentationTrainer(BaseTrainer):
         self.metric_names = ["iou", "dice", "accuracy"]
         self.ignore_index = ignore_index
     
-    def train_epoch(self) -> Dict[str, float]:
-        """Train for one epoch."""
-        self.model.train()
-        total_metrics = {}
-        num_batches = len(self.train_loader)
+    def train_step(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> Dict[str, torch.Tensor]:
+        """Perform a single training step."""
+        images, masks = batch
+        images = images.to(self.device)
+        masks = masks.to(self.device)
         
-        with tqdm(self.train_loader, desc=f'Epoch {self.epoch}') as pbar:
-            for batch in pbar:
-                self.optimizer.zero_grad()
-                metrics = self.train_step(batch)
-                loss = sum(metrics.values())
-                loss.backward()
-                self.optimizer.step()
-                
-                # Update metrics
-                for k, v in metrics.items():
-                    total_metrics[k] = total_metrics.get(k, 0) + v.item()
-                
-                # Update progress bar
-                current_metrics = {k: v.item() for k, v in metrics.items()}
-                pbar.set_postfix(current_metrics)
+        # Forward pass
+        outputs = self.model(images)
         
-        # Average metrics
-        avg_metrics = {k: v / num_batches for k, v in total_metrics.items()}
+        # Calculate loss
+        metrics = {}
+        metrics.update(self.model.get_loss(outputs, masks))  # These will have '_loss' suffix
         
-        if self.scheduler is not None:
-            self.scheduler.step()
-            
-        return avg_metrics
+        # Calculate additional metrics during training (with no_grad)
+        with torch.no_grad():
+            for name, metric_fn in zip(self.metric_names, self.metrics):
+                metrics[name] = metric_fn(outputs["out"], masks)
+        
+        return metrics
     
     def validate(self) -> Dict[str, float]:
         """Validate the model."""
@@ -93,43 +82,20 @@ class SegmentationTrainer(BaseTrainer):
         
         with torch.no_grad():
             with tqdm(self.val_loader, desc='Validation') as pbar:
-                for batch in pbar:
+                for batch_idx, batch in enumerate(pbar, 1):
                     metrics = self.validate_step(batch)
                     
-                    # Update metrics
+                    # Update total metrics
                     for k, v in metrics.items():
                         total_metrics[k] = total_metrics.get(k, 0) + v.item()
                     
-                    # Update progress bar
-                    current_metrics = {k: v.item() for k, v in metrics.items()}
-                    pbar.set_postfix(current_metrics)
+                    # Update progress bar with running averages
+                    running_metrics = {k: f"{v / batch_idx:.4f}" for k, v in total_metrics.items()}
+                    pbar.set_postfix(running_metrics)
         
         # Average metrics
         avg_metrics = {k: v / num_batches for k, v in total_metrics.items()}
         return avg_metrics
-    
-    def train_step(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> Dict[str, torch.Tensor]:
-        """Perform a single training step."""
-        images, masks = batch
-        images = images.to(self.device)
-        masks = masks.to(self.device)
-        
-        # Forward pass
-        outputs = self.model(images)
-        
-        # Calculate loss
-        losses = self.model.get_loss(outputs, masks)
-        
-        # Calculate training metrics
-        metrics = {}
-        metrics.update(losses)
-        
-        # Calculate additional metrics during training
-        with torch.no_grad():
-            for name, metric_fn in zip(self.metric_names, self.metrics):
-                metrics[name] = metric_fn(outputs["out"], masks)
-        
-        return metrics
     
     def validate_step(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Perform a single validation step."""
@@ -144,8 +110,7 @@ class SegmentationTrainer(BaseTrainer):
         metrics = {}
         
         # Calculate loss
-        losses = self.model.get_loss(outputs, masks)
-        metrics.update(losses)
+        metrics.update(self.model.get_loss(outputs, masks))
         
         # Calculate additional metrics
         for name, metric_fn in zip(self.metric_names, self.metrics):

@@ -1,8 +1,11 @@
 #dataset
 NEU_*/
+data/
 
 #model checkpoints
 checkpoints/
+outputs*/
+visualizations/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
