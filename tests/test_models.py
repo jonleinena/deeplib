@@ -6,28 +6,36 @@ def test_unet_initialization():
     model = UNet(num_classes=4)
     assert isinstance(model, UNet)
     
-    # Test output shape
-    x = torch.randn(1, 3, 224, 224)
+    # Test output shape with larger input
+    x = torch.randn(2, 3, 256, 256)  # Increased batch size and spatial dimensions
     with torch.no_grad():
         output = model(x)
-    assert output.shape == (1, 4, 224, 224)
+        if isinstance(output, dict):
+            output = output['out']  # Handle dict output
+    assert output.shape == (2, 4, 256, 256)
 
 def test_deeplabv3_initialization():
     model = DeepLabV3(num_classes=4, pretrained=False)
     assert isinstance(model, DeepLabV3)
     
-    # Test output shape
-    x = torch.randn(1, 3, 224, 224)
+    # Test output shape with larger input
+    x = torch.randn(2, 3, 256, 256)  # Increased batch size and spatial dimensions
+    model.eval()  # Set to eval mode to avoid batch norm issues
     with torch.no_grad():
         output = model(x)
-    assert output.shape == (1, 4, 224, 224)
+        if isinstance(output, dict):
+            output = output['out']  # Handle dict output
+    assert output.shape == (2, 4, 256, 256)
 
 def test_deeplabv3plus_initialization():
     model = DeepLabV3Plus(num_classes=4, pretrained=False)
     assert isinstance(model, DeepLabV3Plus)
     
-    # Test output shape
-    x = torch.randn(1, 3, 224, 224)
+    # Test output shape with larger input
+    x = torch.randn(2, 3, 256, 256)  # Increased batch size and spatial dimensions
+    model.eval()  # Set to eval mode to avoid batch norm issues
     with torch.no_grad():
         output = model(x)
-    assert output.shape == (1, 4, 224, 224) 
+        if isinstance(output, dict):
+            output = output['out']  # Handle dict output
+    assert output.shape == (2, 4, 256, 256) 

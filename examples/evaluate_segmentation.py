@@ -69,7 +69,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_root", type=str, required=True)
     parser.add_argument("--checkpoint", type=str, required=True)
-    parser.add_argument("--model_type", type=str, default="deeplabv3",
+    parser.add_argument("--model_type", type=str, default=None,
                       choices=["deeplabv3", "deeplabv3plus", "unet"],
                       help="Type of model to evaluate")
     parser.add_argument("--num_classes", type=int, required=True)
