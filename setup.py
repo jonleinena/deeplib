@@ -6,36 +6,53 @@ with open("README.md", "r", encoding="utf-8") as fh:
 with open("requirements.txt", "r", encoding="utf-8") as fh:
     requirements = [line.strip() for line in fh if line.strip() and not line.startswith("#")]
 
-# Replace PyTorch requirements with CUDA-specific versions
-cuda_specific_requirements = []
+# Core requirements (excluding PyTorch and logging dependencies)
+core_requirements = []
 for req in requirements:
-    if req.startswith("torch") or req.startswith("torchvision"):
-        # Skip PyTorch requirements as they need special installation
-        continue
-    cuda_specific_requirements.append(req)
+    if not any(req.startswith(pkg) for pkg in ["torch", "torchvision", "tensorboard", "mlflow", "wandb"]):
+        core_requirements.append(req)
+
+# Define logger dependencies
+logger_requirements = [
+    "tensorboard>=2.15.0",
+    "mlflow>=2.9.0",
+    "wandb>=0.16.0"
+]
 
 setup(
     name="deeplib",
-    version="1.0.0",
+    version="1.1.0",
     author="Jon Leiñena",
     author_email="leinenajon@gmail.com",
     description="A deep learning library for computer vision tasks (CUDA ≥11.8 compatible)",
     long_description=long_description + "\n\n" + """
+## Installation Options
+
+### Full Installation (Recommended)
+```bash
+pip install deeplib
+```
+
+### Core Installation (without logging backends)
+```bash
+pip install deeplib[core]
+```
+
 ## CUDA Requirements
 
-This package is compatible with CUDA 11.8 or newer versions. To install the required PyTorch dependencies, use:
+This package requires PyTorch with CUDA 11.8 or newer. To install PyTorch dependencies:
 
 ```bash
 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 ```
 
-For newer CUDA versions, adjust the URL accordingly (e.g., cu121 for CUDA 12.1).
+For other CUDA versions or CPU-only installation, see https://pytorch.org/get-started/locally/
 """,
     long_description_content_type="text/markdown",
     url="https://github.com/jonleinena/deeplib",
     packages=find_packages(),
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "Intended Audience :: Science/Research",
         "License :: OSI Approved :: MIT License",
@@ -46,17 +63,13 @@ For newer CUDA versions, adjust the URL accordingly (e.g., cu121 for CUDA 12.1).
         "Environment :: GPU :: NVIDIA CUDA",
     ],
     python_requires=">=3.10",
-    install_requires=cuda_specific_requirements,
+    install_requires=core_requirements + logger_requirements,  # Full installation by default
     extras_require={
-        "cuda": [
-            "torch>=2.4.0",
-            "torchvision>=0.19.0",
-        ],
-        "loggers": [
-            "mlflow>=2.9.0",
-            "tensorboard>=2.15.0",
-            "wandb>=0.16.0",
-            "Pillow>=10.0.0",
-        ]
+        "core": core_requirements,  # Core installation without loggers
+        "all": core_requirements + logger_requirements,  # Same as default
+        # Individual logger installations
+        "tensorboard": core_requirements + ["tensorboard>=2.15.0"],
+        "mlflow": core_requirements + ["mlflow>=2.9.0"],
+        "wandb": core_requirements + ["wandb>=0.16.0"]
     }
 ) 
