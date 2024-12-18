@@ -1,10 +1,15 @@
 Trainers
 ========
 
+.. automodule:: deeplib.trainers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Segmentation Trainer
 ------------------
 
-.. automodule:: deeplib.trainers.segmentation
+.. autoclass:: deeplib.trainers.SegmentationTrainer
    :members:
    :undoc-members:
    :show-inheritance:
@@ -12,7 +17,7 @@ Segmentation Trainer
 Base Trainer
 -----------
 
-.. automodule:: deeplib.trainers.base
+.. autoclass:: deeplib.trainers.BaseTrainer
    :members:
    :undoc-members:
    :show-inheritance: 

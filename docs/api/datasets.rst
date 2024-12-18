@@ -1,10 +1,15 @@
 Datasets
 ========
 
+.. automodule:: deeplib.datasets
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 Segmentation Dataset
 ------------------
 
-.. automodule:: deeplib.datasets.segmentation
+.. autoclass:: deeplib.datasets.SegmentationDataset
    :members:
    :undoc-members:
    :show-inheritance:
@@ -12,7 +17,7 @@ Segmentation Dataset
 Base Dataset
 -----------
 
-.. automodule:: deeplib.datasets.base
+.. autoclass:: deeplib.datasets.BaseDataset
    :members:
    :undoc-members:
    :show-inheritance: 

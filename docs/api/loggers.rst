@@ -1,10 +1,15 @@
 Loggers
 =======
 
+.. automodule:: deeplib.loggers
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 TensorBoard Logger
 ----------------
 
-.. automodule:: deeplib.loggers.tensorboard
+.. autoclass:: deeplib.loggers.TensorBoardLogger
    :members:
    :undoc-members:
    :show-inheritance:
@@ -12,7 +17,7 @@ TensorBoard Logger
 MLflow Logger
 ------------
 
-.. automodule:: deeplib.loggers.mlflow
+.. autoclass:: deeplib.loggers.MLFlowLogger
    :members:
    :undoc-members:
    :show-inheritance:
@@ -20,7 +25,7 @@ MLflow Logger
 Weights & Biases Logger
 ---------------------
 
-.. automodule:: deeplib.loggers.wandb
+.. autoclass:: deeplib.loggers.WandbLogger
    :members:
    :undoc-members:
    :show-inheritance:
@@ -28,7 +33,7 @@ Weights & Biases Logger
 Base Logger
 ----------
 
-.. automodule:: deeplib.loggers.base
+.. autoclass:: deeplib.loggers.BaseLogger
    :members:
    :undoc-members:
    :show-inheritance: 

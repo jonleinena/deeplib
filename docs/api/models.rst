@@ -4,10 +4,15 @@ Models
 Segmentation Models
 -----------------
 
+.. automodule:: deeplib.models.segmentation
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
 UNet
 ~~~~
 
-.. automodule:: deeplib.models.segmentation.unet
+.. autoclass:: deeplib.models.segmentation.UNet
    :members:
    :undoc-members:
    :show-inheritance:
@@ -15,7 +20,7 @@ UNet
 DeepLabV3
 ~~~~~~~~~
 
-.. automodule:: deeplib.models.segmentation.deeplabv3
+.. autoclass:: deeplib.models.segmentation.DeepLabV3
    :members:
    :undoc-members:
    :show-inheritance:
@@ -23,7 +28,7 @@ DeepLabV3
 DeepLabV3+
 ~~~~~~~~~~
 
-.. automodule:: deeplib.models.segmentation.deeplabv3plus
+.. autoclass:: deeplib.models.segmentation.DeepLabV3Plus
    :members:
    :undoc-members:
    :show-inheritance: 
