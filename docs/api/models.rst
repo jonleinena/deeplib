@@ -8,7 +8,6 @@ Segmentation Models
    :members:
    :undoc-members:
    :show-inheritance:
-   :no-index:
 
 UNet
 ~~~~

@@ -5,7 +5,7 @@ Datasets
    :members:
    :undoc-members:
    :show-inheritance:
-   :no-index:
+
 
 Segmentation Dataset
 ------------------

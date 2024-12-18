@@ -5,7 +5,7 @@ Loggers
    :members:
    :undoc-members:
    :show-inheritance:
-   :no-index:
+
 
 TensorBoard Logger
 ----------------

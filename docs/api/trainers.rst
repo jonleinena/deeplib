@@ -5,7 +5,7 @@ Trainers
    :members:
    :undoc-members:
    :show-inheritance:
-   :no-index:
+
 
 Segmentation Trainer
 ------------------
