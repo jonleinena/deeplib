@@ -51,6 +51,12 @@ For newer CUDA versions, adjust the URL accordingly (e.g., cu121 for CUDA 12.1).
         "cuda": [
             "torch>=2.4.0",
             "torchvision>=0.19.0",
+        ],
+        "loggers": [
+            "mlflow>=2.9.0",
+            "tensorboard>=2.15.0",
+            "wandb>=0.16.0",
+            "Pillow>=10.0.0",
         ]
     }
 ) 
