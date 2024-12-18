@@ -30,7 +30,19 @@ class BaseLogger(ABC):
         self.tracking_uri = tracking_uri
         self.artifact_location = artifact_location
         self.tags = tags or {}
+        self._active_run = False
         
+    def __enter__(self):
+        """Context manager entry."""
+        if not self._active_run:
+            self.start_run()
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        if self._active_run:
+            self.end_run()
+    
     @abstractmethod
     def start_run(self) -> None:
         """Start a new run."""
@@ -91,12 +103,3 @@ class BaseLogger(ABC):
             step: Current step/epoch number
         """
         pass
-    
-    def __enter__(self):
-        """Context manager entry."""
-        self.start_run()
-        return self
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Context manager exit."""
-        self.end_run()

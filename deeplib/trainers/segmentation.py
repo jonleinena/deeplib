@@ -5,6 +5,7 @@ from tqdm import tqdm
 
 from .base import BaseTrainer
 from ..metrics import iou_score, dice_score, pixel_accuracy
+from ..loggers import BaseLogger
 
 
 class SegmentationTrainer(BaseTrainer):
@@ -20,7 +21,8 @@ class SegmentationTrainer(BaseTrainer):
         device="cuda" if torch.cuda.is_available() else "cpu",
         metrics: Optional[List[Callable]] = None,
         ignore_index: Optional[int] = None,
-        monitor_metric: str = "seg_loss"
+        monitor_metric: str = "seg_loss",
+        logger: Optional[BaseLogger] = None,
     ):
         """Initialize trainer.
         
@@ -33,6 +35,8 @@ class SegmentationTrainer(BaseTrainer):
             device: Device to use
             metrics: List of metric functions to compute during validation
             ignore_index: Index to ignore in metrics computation
+            monitor_metric: Metric to monitor for early stopping
+            logger: Logger instance for experiment tracking
         """
         super().__init__(
             model=model,
@@ -41,7 +45,8 @@ class SegmentationTrainer(BaseTrainer):
             optimizer=optimizer,
             scheduler=scheduler,
             device=device,
-            monitor_metric=monitor_metric
+            monitor_metric=monitor_metric,
+            logger=logger
         )
         self.metrics = metrics or [
             lambda x, y: iou_score(x, y, model.num_classes, ignore_index),
@@ -70,33 +75,7 @@ class SegmentationTrainer(BaseTrainer):
                 metrics[name] = metric_fn(outputs["out"], masks)
         
         return metrics
-    
-    def validate(self) -> Dict[str, float]:
-        """Validate the model."""
-        if self.val_loader is None:
-            return {}
-            
-        self.model.eval()
-        total_metrics = {}
-        num_batches = len(self.val_loader)
         
-        with torch.no_grad():
-            with tqdm(self.val_loader, desc='Validation') as pbar:
-                for batch_idx, batch in enumerate(pbar, 1):
-                    metrics = self.validate_step(batch)
-                    
-                    # Update total metrics
-                    for k, v in metrics.items():
-                        total_metrics[k] = total_metrics.get(k, 0) + v.item()
-                    
-                    # Update progress bar with running averages
-                    running_metrics = {k: f"{v / batch_idx:.4f}" for k, v in total_metrics.items()}
-                    pbar.set_postfix(running_metrics)
-        
-        # Average metrics
-        avg_metrics = {k: v / num_batches for k, v in total_metrics.items()}
-        return avg_metrics
-    
     def validate_step(self, batch: Tuple[torch.Tensor, torch.Tensor]) -> Dict[str, torch.Tensor]:
         """Perform a single validation step."""
         images, masks = batch

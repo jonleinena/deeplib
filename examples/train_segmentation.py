@@ -10,12 +10,12 @@ import torch
 import torch.utils.data as data
 from albumentations.pytorch import ToTensorV2
 from torch.optim.lr_scheduler import ReduceLROnPlateau
-import matplotlib.pyplot as plt
 
 from deeplib.datasets import SegmentationDataset
 from deeplib.models.segmentation import UNet
 from deeplib.trainers import SegmentationTrainer
 from deeplib.metrics import iou_score, dice_score
+from deeplib.loggers import MLFlowLogger, TensorBoardLogger, WandbLogger
 
 
 def get_device():
@@ -46,42 +46,6 @@ def get_transform(train: bool = True, input_size: int = 224):
         ])
 
 
-def plot_training_curves(history, save_dir: Path):
-    """Plot training and validation curves."""
-    # Create the plots directory
-    plots_dir = save_dir / "plots"
-    plots_dir.mkdir(exist_ok=True)
-    
-    # Get all metrics from the first epoch
-    if len(history['train']) == 0:
-        print("No training history to plot")
-        return
-        
-    metrics = history['train'][0].keys()
-    epochs = range(len(history['train']))
-    
-    # Plot each metric
-    for metric in metrics:
-        plt.figure(figsize=(10, 6))
-        
-        # Get values for this metric
-        train_values = [epoch_metrics[metric] for epoch_metrics in history['train']]
-        plt.plot(epochs, train_values, 'b-', label=f'Training')
-        
-        # Plot validation if available
-        if history['val'] and metric in history['val'][0]:
-            val_values = [epoch_metrics[metric] for epoch_metrics in history['val']]
-            plt.plot(epochs, val_values, 'r-', label=f'Validation')
-        
-        plt.title(f'{metric} vs Epochs')
-        plt.xlabel('Epoch')
-        plt.ylabel(metric)
-        plt.legend()
-        plt.grid(True)
-        plt.savefig(plots_dir / f'{metric}_curve.png')
-        plt.close()
-
-
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data_root", type=str, required=True)
@@ -100,6 +64,8 @@ def main():
                       help="Metric to monitor for early stopping.")
     parser.add_argument("--loss", type=str, default="dice", choices=["ce", "dice", "wce", "jaccard", "focal"],
                       help="Loss function to use (ce: cross entropy, dice: dice loss, wce: weighted cross entropy, jaccard: IoU loss, focal: focal loss)")
+    parser.add_argument("--logger", type=str, choices=["tensorboard", "mlflow", "wandb", "none"], default="tensorboard",
+                      help="Logger to use for tracking experiments")
     args = parser.parse_args()
     
     # Set device
@@ -168,6 +134,46 @@ def main():
     ]
     metric_names = ["iou", "dice"]
     
+    # Set up logger if requested
+    logger = None
+    if args.logger != "none":
+        # Create experiment name from parameters
+        experiment_name = f"segmentation_{args.loss}_loss"
+        run_name = f"bs{args.batch_size}_lr{args.learning_rate}"
+        
+        if args.logger == "tensorboard":
+            logger = TensorBoardLogger(
+                experiment_name=experiment_name,
+                run_name=run_name,
+                artifact_location=str(output_dir / "tensorboard")
+            )
+        elif args.logger == "mlflow":
+            logger = MLFlowLogger(
+                experiment_name=experiment_name,
+                run_name=run_name,
+                artifact_location=str(output_dir / "mlflow")
+            )
+        elif args.logger == "wandb":
+            logger = WandbLogger(
+                experiment_name=experiment_name,
+                run_name=run_name,
+                project="deeplib-segmentation"
+            )
+            
+        with logger:
+            logger.log_params({
+                "loss_type": args.loss,
+                "batch_size": args.batch_size,
+                "learning_rate": args.learning_rate,
+                "input_size": args.input_size,
+                "num_classes": args.num_classes,
+            "dropout_p": args.dropout_p,
+            "ignore_index": args.ignore_index,
+            "device": str(device),
+            "optimizer": "AdamW",
+            "scheduler": "ReduceLROnPlateau"
+        })
+    
     # Create trainer
     trainer = SegmentationTrainer(
         model=model,
@@ -178,20 +184,19 @@ def main():
         device=device,
         metrics=custom_metrics,
         ignore_index=args.ignore_index,
-        monitor_metric=args.monitor_metric
+        monitor_metric=args.monitor_metric,
+        logger=logger
     )
     
     # Train model
     save_path = output_dir / "checkpoints" / "UNet_segmentation.pth"
     save_path.parent.mkdir(exist_ok=True)
     
-    history = trainer.train(
+    trainer.train(
         num_epochs=args.num_epochs,
         save_path=str(save_path)
     )
-    
-    # Plot training curves
-    plot_training_curves(history, output_dir)
+
 
 
 if __name__ == "__main__":

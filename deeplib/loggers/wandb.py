@@ -36,28 +36,28 @@ class WandbLogger(BaseLogger):
         super().__init__(experiment_name, run_name, tracking_uri, artifact_location, tags)
         self.project = project or "deeplib"
         self.entity = entity
-        self.run = None
+        self._active_run = False
     
     def start_run(self) -> None:
         """Start a new W&B run."""
-        self.run = wandb.init(
+        if self._active_run:
+            return
+            
+        # Initialize W&B run
+        wandb.init(
             project=self.project,
-            entity=self.entity,
             name=self.run_name,
-            group=self.experiment_name,
-            tags=list(self.tags.keys()) if self.tags else None,
-            reinit=True
+            tags=self.tags,
+            dir=self.artifact_location
         )
         
-        # Log tags as config
-        if self.tags:
-            wandb.config.update({"tags": self.tags})
+        self._active_run = True
     
     def end_run(self) -> None:
         """End the current W&B run."""
-        if self.run:
+        if self._active_run:
             wandb.finish()
-            self.run = None
+            self._active_run = False
     
     def log_params(self, params: Dict[str, Any]) -> None:
         """Log parameters using W&B.

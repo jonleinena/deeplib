@@ -44,22 +44,38 @@ class MLFlowLogger(BaseLogger):
         else:
             self.experiment_id = experiment.experiment_id
             
-        self.active_run = None
+        self._active_run = False
     
-    def start_run(self) -> None:
+    def __enter__(self):
+        """Context manager entry."""
+        if not self._active_run:
+            self.start_run()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Context manager exit."""
+        if self._active_run:
+            self.end_run()
+
+    def start_run(self):
         """Start a new MLflow run."""
-        self.active_run = mlflow.start_run(
+        if self._active_run:
+            return
+            
+        # Start the run using the stored experiment ID
+        mlflow.start_run(
             experiment_id=self.experiment_id,
             run_name=self.run_name,
-            tags=self.tags,
+            tags={},
             nested=True
         )
+        self._active_run = True
     
     def end_run(self) -> None:
         """End the current MLflow run."""
-        if self.active_run:
+        if self._active_run:
             mlflow.end_run()
-            self.active_run = None
+            self._active_run = False
     
     def log_params(self, params: Dict[str, Any]) -> None:
         """Log parameters using MLflow.
@@ -128,17 +144,22 @@ class MLFlowLogger(BaseLogger):
             if image.max() <= 1.0:
                 image = (image * 255).astype(np.uint8)
             
-            # Convert to PIL Image
-            image = Image.fromarray(image)
+            # Handle grayscale images
+            if image.shape[-1] == 1:
+                image = image.squeeze(-1)
+            
+            # Ensure uint8 format
+            image = image.astype(np.uint8)
         elif isinstance(image, (str, Path)):
-            image = Image.open(str(image))
+            image = np.array(Image.open(str(image)))
         
         # Create a temporary file to save the image
         temp_path = f"{title}.png" if not step else f"{title}_{step}.png"
-        image.save(temp_path)
+        Image.fromarray(image).save(temp_path)
         
         # Log the image file
         mlflow.log_artifact(temp_path)
         
         # Clean up
-        Path(temp_path).unlink() 
+        Path(temp_path).unlink()
+        

@@ -39,21 +39,25 @@ class TensorBoardLogger(BaseLogger):
         self.writer = None
     
     def start_run(self) -> None:
-        """Start a new TensorBoard run by creating a SummaryWriter."""
-        self.writer = SummaryWriter(str(self.log_dir))
+        """Start a new TensorBoard run by creating the writer."""
+        if self._active_run:
+            return
+            
+        # Create log directory
+        log_dir = Path(self.artifact_location) / self.experiment_name
+        if self.run_name:
+            log_dir = log_dir / self.run_name
+        log_dir.mkdir(parents=True, exist_ok=True)
         
-        # Log tags as text
-        if self.tags:
-            self.writer.add_text(
-                "tags",
-                "\n".join([f"{k}: {v}" for k, v in self.tags.items()])
-            )
+        self.log_dir = log_dir
+        self.writer = SummaryWriter(str(log_dir))
+        self._active_run = True
     
     def end_run(self) -> None:
         """End the current TensorBoard run."""
-        if self.writer:
+        if self._active_run:
             self.writer.close()
-            self.writer = None
+            self._active_run = False
     
     def log_params(self, params: Dict[str, Any]) -> None:
         """Log parameters using TensorBoard.
