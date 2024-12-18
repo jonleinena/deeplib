@@ -2,12 +2,48 @@
 
 A unified PyTorch library for computer vision tasks, focusing on object detection, semantic segmentation, and anomaly detection.
 
+## Installation
+
+### Prerequisites
+
+DeepLib requires PyTorch and torchvision to be installed first. For optimal performance, CUDA 11.8 or above is recommended.
+
+You can install PyTorch with CUDA support using:
+```bash
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
+```
+
+For other installation options (CPU-only, different CUDA versions), see the [PyTorch installation guide](https://pytorch.org/get-started/locally/).
+
+### Installing DeepLib
+
+#### Full Installation
+Install DeepLib with all optional dependencies (recommended):
+```bash
+pip install deeplib
+```
+
+#### Core Installation
+Install only the core functionality (no logging backends):
+```bash
+pip install deeplib[core]
+```
+
+## Documentation
+
+Full documentation is available at [https://jonleinena.github.io/deeplib/](https://jonleinena.github.io/deeplib/)
+
 ## Features
 
 - **Semantic Segmentation Models** (✅ Implemented)
   - UNet
   - DeepLabV3
   - DeepLabV3+
+
+- **Experiment Tracking** (✅ Implemented)
+  - TensorBoard
+  - MLflow
+  - Weights & Biases (W&B)
 
 - **Object Detection Models** (🚧 In Progress)
   - YOLOv4
@@ -22,25 +58,17 @@ A unified PyTorch library for computer vision tasks, focusing on object detectio
   - PADIM
   - Other anomalib implementations
 
-## Installation
-
-```bash
-pip install -e .
-```
-
 ## Quick Start - Semantic Segmentation
 
 ```python
-from deeplib.models.segmentation import UNet, DeepLabV3, DeepLabV3Plus
+from deeplib.models.segmentation import UNet
 from deeplib.trainers import SegmentationTrainer
 from deeplib.datasets import SegmentationDataset
+from deeplib.loggers import WandbLogger  # or TensorBoardLogger, MLFlowLogger
 from torch.utils.data import DataLoader
-import torch
 
-# Initialize model (choose one)
-model = UNet(num_classes=4)  # Simple and effective
-# model = DeepLabV3(num_classes=4, pretrained=True)  # Good for high-level features
-# model = DeepLabV3Plus(num_classes=4, pretrained=True)  # Best performance, slower
+# Initialize model
+model = UNet(num_classes=4)
 
 # Prepare dataset
 train_dataset = SegmentationDataset(
@@ -62,100 +90,36 @@ val_dataset = SegmentationDataset(
 train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 val_loader = DataLoader(val_dataset, batch_size=8)
 
-# Configure loss function (choose one):
+# Configure loss function (e.g., Dice Loss)
+model.configure_loss('dice', {'ignore_index': 255})
 
-# 1. Standard Cross Entropy
-model.configure_loss('ce', {'ignore_index': 255})
+# Initialize logger (choose one)
+logger = WandbLogger(
+    experiment_name="segmentation_experiment",
+    project="deeplib-segmentation"
+)
+# Or use TensorBoard:
+# logger = TensorBoardLogger(experiment_name="segmentation_experiment")
+# Or use MLflow:
+# logger = MLFlowLogger(experiment_name="segmentation_experiment")
 
-# 2. Weighted Cross Entropy (for class imbalance)
-class_weights = torch.tensor([1.0, 2.0, 0.5, 1.5])  # Higher weight = more importance
-model.configure_loss('wce', {
-    'weights': class_weights,
-    'ignore_index': 255
-})
-
-# 3. Dice Loss (better for imbalanced segmentation)
-model.configure_loss('dice', {
-    'smooth': 1.0,
-    'ignore_index': 255
-})
-
-# 4. Jaccard/IoU Loss
-model.configure_loss('jaccard', {
-    'smooth': 1.0,
-    'ignore_index': 255
-})
-
-# 5. Focal Loss (for hard examples)
-model.configure_loss('focal', {
-    'alpha': 0.25,
-    'gamma': 2.0,
-    'ignore_index': 255
-})
-
-# 6. Binary Cross Entropy (for binary segmentation)
-model.configure_loss('bce', {'ignore_index': 255})
-
-# 7. Generalized Cross Entropy (robust to noisy labels)
-model.configure_loss('gce', {
-    'q': 0.7,
-    'ignore_index': 255
-})
-
-# 8. Combo Loss (combine multiple losses)
-model.configure_loss('combo', {
-    'weights': {
-        'ce': 1.0,    # Cross Entropy
-        'dice': 1.0,  # Dice Loss
-        'focal': 0.5  # Focal Loss
-    },
-    'ignore_index': 255
-})
-
-# Initialize trainer with learning rate scheduler
+# Initialize trainer with logger
 trainer = SegmentationTrainer(
     model=model,
     train_loader=train_loader,
     val_loader=val_loader,
-    monitor_metric='iou'  # Monitor IoU for LR scheduling
+    monitor_metric='iou',  # Monitor IoU for LR scheduling
+    logger=logger
 )
 
 # Train model
-history = trainer.train(
+trainer.train(
     num_epochs=100,
-    save_path='best_model.pth',
-    early_stopping=20
+    save_path='best_model.pth'
 )
 ```
 
-## Running the Training example
-
-Train a segmentation model with different loss functions:
-```bash
-# Cross Entropy Loss
-python examples/train_segmentation.py \
-    --data_root ./data \
-    --num_classes 4 \
-    --loss_type ce \
-    --loss_params '{"ignore_index": 255}' \
-    --monitor_metric iou
-
-# Dice Loss
-python examples/train_segmentation.py \
-    --data_root ./data \
-    --num_classes 4 \
-    --loss_type dice \
-    --loss_params '{"smooth": 1.0, "ignore_index": 255}' \
-    --monitor_metric iou
-
-# Combo Loss (CE + Dice)
-python examples/train_segmentation.py \
-    --data_root ./data \
-    --num_classes 4 \
-    --loss_type combo \
-    --loss_params '{"weights": {"ce": 1.0, "dice": 1.0}, "ignore_index": 255}' \
-    --monitor_metric iou
-```
+For more examples and detailed usage, check the [examples directory](examples/).
 
 ## Project Structure
 
@@ -165,14 +129,23 @@ deeplib/
 │   ├── segmentation/  # ✅ Semantic segmentation models
 │   ├── detection/     # 🚧 Object detection models (TODO)
 │   └── anomaly/       # 🚧 Anomaly detection models (TODO)
-├── trainers/          # Training logic
+├── trainers/          # Training logic and utilities
 ├── datasets/          # Dataset implementations
-└── utils/            # Utility functions
+├── loggers/           # ✅ Experiment tracking (TensorBoard, MLflow, W&B)
+└── utils/             # Utility functions
 ```
 
-## TODO List
+## Development Roadmap
 
 ### High Priority
+- [x] Implement experiment tracking
+  - [x] TensorBoard support
+  - [x] MLflow support
+  - [x] W&B support
+- [x] Add comprehensive documentation
+  - [x] API Reference
+  - [x] Examples
+  - [x] Installation Guide
 - [ ] Implement object detection models
   - [ ] YOLOv4
   - [ ] YOLOv5
@@ -199,13 +172,17 @@ deeplib/
 - [ ] Add model pruning
 - [ ] Add hyperparameter tuning
 
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE.md) file for details.
 
 ## Acknowledgments
 
-This library is inspired upon the following projects:
+This library is inspired by the following projects:
 - torchvision
 - anomalib
 - segmentation-models-pytorch
