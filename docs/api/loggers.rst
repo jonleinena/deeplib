@@ -5,6 +5,7 @@ Loggers
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 TensorBoard Logger
 ----------------
@@ -13,6 +14,7 @@ TensorBoard Logger
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 MLflow Logger
 ------------
@@ -21,6 +23,7 @@ MLflow Logger
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Weights & Biases Logger
 ---------------------
@@ -29,6 +32,7 @@ Weights & Biases Logger
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Base Logger
 ----------
@@ -36,4 +40,5 @@ Base Logger
 .. autoclass:: deeplib.loggers.BaseLogger
    :members:
    :undoc-members:
-   :show-inheritance: 
+   :show-inheritance:
+   :no-index: 

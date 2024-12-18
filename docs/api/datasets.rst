@@ -5,6 +5,7 @@ Datasets
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Segmentation Dataset
 ------------------
@@ -13,6 +14,7 @@ Segmentation Dataset
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Base Dataset
 -----------
@@ -20,4 +22,5 @@ Base Dataset
 .. autoclass:: deeplib.datasets.BaseDataset
    :members:
    :undoc-members:
-   :show-inheritance: 
+   :show-inheritance:
+   :no-index: 

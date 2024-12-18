@@ -5,6 +5,7 @@ Trainers
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Segmentation Trainer
 ------------------
@@ -13,6 +14,7 @@ Segmentation Trainer
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 Base Trainer
 -----------
@@ -20,4 +22,5 @@ Base Trainer
 .. autoclass:: deeplib.trainers.BaseTrainer
    :members:
    :undoc-members:
-   :show-inheritance: 
+   :show-inheritance:
+   :no-index: 

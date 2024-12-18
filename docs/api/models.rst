@@ -8,6 +8,7 @@ Segmentation Models
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 UNet
 ~~~~
@@ -16,6 +17,7 @@ UNet
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 DeepLabV3
 ~~~~~~~~~
@@ -24,6 +26,7 @@ DeepLabV3
    :members:
    :undoc-members:
    :show-inheritance:
+   :no-index:
 
 DeepLabV3+
 ~~~~~~~~~~
@@ -31,4 +34,5 @@ DeepLabV3+
 .. autoclass:: deeplib.models.segmentation.DeepLabV3Plus
    :members:
    :undoc-members:
-   :show-inheritance: 
+   :show-inheritance:
+   :no-index: 
