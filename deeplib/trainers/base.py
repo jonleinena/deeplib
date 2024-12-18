@@ -6,6 +6,8 @@ from torch.utils.data import DataLoader
 from torch.optim.lr_scheduler import _LRScheduler, ReduceLROnPlateau
 from tqdm import tqdm
 
+from ..loggers import BaseLogger
+
 
 class BaseTrainer(ABC):
     """Base trainer class for all models."""
@@ -19,6 +21,7 @@ class BaseTrainer(ABC):
         scheduler: Optional[Any] = None,
         device: str = "cuda" if torch.cuda.is_available() else "cpu",
         monitor_metric: str = "loss",
+        logger: Optional[BaseLogger] = None,
     ):
         """
         Args:
@@ -29,6 +32,7 @@ class BaseTrainer(ABC):
             scheduler: Learning rate scheduler
             device: Device to use for training
             monitor_metric: Metric name to monitor for early stopping and model saving
+            logger: Logger instance for experiment tracking
         """
         self.model = model.to(device)
         self.train_loader = train_loader
@@ -37,6 +41,7 @@ class BaseTrainer(ABC):
         self.scheduler = scheduler
         self.device = device
         self.monitor_metric = monitor_metric
+        self.logger = logger
         self.epoch = 0
         self.best_metric = float('inf') if self.monitor_metric == 'loss' else -float('inf')
         
@@ -51,6 +56,11 @@ class BaseTrainer(ABC):
             self.scheduler.step(val_metrics.get(self.monitor_metric, 0))
         else:
             self.scheduler.step()
+            
+        # Log learning rate if logger is available
+        if self.logger:
+            current_lr = self.optimizer.param_groups[0]['lr']
+            self.logger.log_metrics({"learning_rate": current_lr}, step=self.epoch)
 
     def train_epoch(self) -> Dict[str, float]:
         """Train for one epoch."""
@@ -72,7 +82,7 @@ class BaseTrainer(ABC):
                 for k, v in metrics.items():
                     total_metrics[k] = total_metrics.get(k, 0) + v.item()
                 
-                # Update progress bar with running averages and current learning rate
+                # Update progress bar with running averages
                 running_metrics = {k: f"{v / batch_idx:.4f}" for k, v in total_metrics.items()}
                 current_lr = self.optimizer.param_groups[0]['lr']
                 running_metrics['lr'] = f"{current_lr:.2e}"
@@ -80,6 +90,13 @@ class BaseTrainer(ABC):
         
         # Average metrics
         avg_metrics = {k: v / num_batches for k, v in total_metrics.items()}
+        
+        # Log epoch metrics if logger is available
+        if self.logger:
+            # Add train prefix to metrics
+            train_metrics = {f"train/{k}": v for k, v in avg_metrics.items()}
+            self.logger.log_metrics(train_metrics, step=self.epoch)
+        
         return avg_metrics
     
     @abstractmethod
@@ -97,13 +114,27 @@ class BaseTrainer(ABC):
         num_batches = len(self.val_loader)
         
         with torch.no_grad():
-            for batch in tqdm(self.val_loader, desc='Validation'):
-                metrics = self.validate_step(batch)
-                for k, v in metrics.items():
-                    total_metrics[k] = total_metrics.get(k, 0) + v.item()
+            with tqdm(self.val_loader, desc='Validation') as pbar:
+                for batch_idx, batch in enumerate(pbar, 1):
+                    metrics = self.validate_step(batch)
+                    
+                    # Update total metrics
+                    for k, v in metrics.items():
+                        total_metrics[k] = total_metrics.get(k, 0) + v.item()
+                    
+                    # Update progress bar with running averages
+                    running_metrics = {k: f"{v / batch_idx:.4f}" for k, v in total_metrics.items()}
+                    pbar.set_postfix(running_metrics)
         
         # Average metrics
         avg_metrics = {k: v / num_batches for k, v in total_metrics.items()}
+        
+        # Log epoch metrics if logger is available
+        if self.logger:
+            # Add val prefix to metrics
+            val_metrics = {f"val/{k}": v for k, v in avg_metrics.items()}
+            self.logger.log_metrics(val_metrics, step=self.epoch)
+        
         return avg_metrics
     
     @abstractmethod
