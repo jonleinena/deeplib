@@ -20,18 +20,35 @@ extensions = [
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
-language = 'en'
 
 # -- Options for HTML output -------------------------------------------------
-html_theme = 'sphinx_rtd_theme'  # Use the Read the Docs theme
+html_theme = 'sphinx_rtd_theme'
+html_theme_options = {
+    'navigation_depth': 4,
+    'collapse_navigation': False,
+    'sticky_navigation': True,
+    'includehidden': True,
+    'titles_only': False,
+    'display_version': True,
+    'logo_only': False,
+    'style_nav_header_background': '#2980B9',
+}
+
 html_static_path = ['_static']
+html_title = 'DeepLib Documentation'
+html_short_title = 'DeepLib'
+html_show_sourcelink = False
+html_show_sphinx = False
 
 # -- Extension configuration -------------------------------------------------
+autodoc_member_order = 'bysource'
+add_module_names = False
+autodoc_typehints = 'description'
+autodoc_class_signature = 'separated'
+
+# Intersphinx configuration
 intersphinx_mapping = {
     'python': ('https://docs.python.org/3', None),
     'torch': ('https://pytorch.org/docs/stable/', None),
+    'numpy': ('https://numpy.org/doc/stable/', None),
 }
-
-# -- autodoc configuration -------------------------------------------------
-autodoc_member_order = 'bysource'  # Document members in source code order
-add_module_names = False           # Don't prefix members with module name 
