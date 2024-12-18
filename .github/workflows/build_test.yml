@@ -3,8 +3,18 @@ name: Build Test
 on:
   push:
     branches: [ master ]
+    paths:
+      - 'deeplib/**'
+      - 'setup.py'
+      - 'requirements.txt'
+      - '.github/workflows/build_test.yml'
   pull_request:
     branches: [ master ]
+    paths:
+      - 'deeplib/**'
+      - 'setup.py'
+      - 'requirements.txt'
+      - '.github/workflows/build_test.yml'
 
 jobs:
   build:
@@ -39,4 +49,4 @@ jobs:
     - name: Test import
       run: |
         pip install dist/*.whl
-        python -c "import deeplib" 
+        python -c "import deeplib"
