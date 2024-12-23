@@ -150,31 +150,66 @@ class SegmentationBenchmark:
         input_size = ref_params.get('input_size', 224)
         
         if self.dataset_name == 'pascal_voc':
-            num_classes = 21
-            images_dir = 'JPEGImages'
-            masks_dir = 'SegmentationClass'
+            # Use VOCSegmentation directly
+            from torchvision.datasets import VOCSegmentation
+            from torchvision import transforms as T
+            
+            transform = T.Compose([
+                T.Resize((input_size, input_size)),
+                T.ToTensor(),
+                T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+            
+            target_transform = T.Compose([
+                T.Resize((input_size, input_size), interpolation=T.InterpolationMode.NEAREST),
+                T.PILToTensor(),
+                lambda x: torch.squeeze(x, 0),  # Remove the extra dimension
+                lambda x: x.long()  # Convert to Long type
+            ])
+            
+            logger.info("Setting up Pascal VOC dataset...")
+            train_dataset = VOCSegmentation(
+                root=str(self.data_dir),
+                year='2012',
+                image_set='train',
+                download=True,
+                transform=transform,
+                target_transform=target_transform
+            )
+            
+            val_dataset = VOCSegmentation(
+                root=str(self.data_dir),
+                year='2012',
+                image_set='val',
+                download=True,
+                transform=transform,
+                target_transform=target_transform
+            )
+            
+            num_classes = 21  # 20 classes + background
+            
         else:  # cityscapes
             num_classes = 19
             images_dir = 'leftImg8bit'
             masks_dir = 'gtFine'
-        
-        train_dataset = SegmentationDataset(
-            root=str(self.data_dir),
-            images_dir=images_dir,
-            masks_dir=masks_dir,
-            num_classes=num_classes,
-            split="train",
-            transform=get_transform(train=True, input_size=input_size)
-        )
-        
-        val_dataset = SegmentationDataset(
-            root=str(self.data_dir),
-            images_dir=images_dir,
-            masks_dir=masks_dir,
-            num_classes=num_classes,
-            split="val",
-            transform=get_transform(train=False, input_size=input_size)
-        )
+            
+            train_dataset = SegmentationDataset(
+                root=str(self.data_dir),
+                images_dir=images_dir,
+                masks_dir=masks_dir,
+                num_classes=num_classes,
+                split="train",
+                transform=get_transform(train=True, input_size=input_size)
+            )
+            
+            val_dataset = SegmentationDataset(
+                root=str(self.data_dir),
+                images_dir=images_dir,
+                masks_dir=masks_dir,
+                num_classes=num_classes,
+                split="val",
+                transform=get_transform(train=False, input_size=input_size)
+            )
         
         return train_dataset, val_dataset, num_classes
 
@@ -255,7 +290,7 @@ class SegmentationBenchmark:
         # Configure training
         experiment_name = f"{model_name}_{self.dataset_name}"
         logger_dir = self.output_dir / 'tensorboard' / experiment_name
-        tb_logger = TensorBoardLogger(log_dir=str(logger_dir))
+        tb_logger = TensorBoardLogger(experiment_name=experiment_name, run_name="benchmark", artifact_location=str(logger_dir))
         
         # Initialize trainer
         trainer = SegmentationTrainer(
